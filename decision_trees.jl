@@ -2,10 +2,11 @@ module DecisionTreeAlgorithm
 
 using Combinatorics
 using DataStructures
+using ProgressMeter
 
 export Partition, DecisionTreeStep, DecisionTree
 export apply_decision_tree, check_partition_compatibility
-export partition_repr
+export partition_repr, enumerate_compatible_partitions
 
 
 Partition{T} = Vector{Vector{T}}
@@ -256,6 +257,48 @@ function check_partition_compatibility(
 
     universal_graph = UniversalGraph(g1_condensation, colorings, partitions)
     return all(check_universal_graph_partition.(Ref(universal_graph), colorings, partitions))
+end
+
+function enumerate_compatible_partitions(
+            g1_condensation::Matrix{Bool},
+            colorings::Vector{Matrix{Int}},
+            prefix::Vector{T}
+        ) where T <: Integer
+    n = size(g1_condensation, 1) - 1
+    set_partitions = collect(partitions(1:n))
+    current_prefix = copy(prefix)
+    compatible_partitions = Vector{T}[]
+    init_length = length(current_prefix)
+
+    D = length(set_partitions)
+    progress = Progress(D ^ (length(colorings) - init_length))
+
+    while true
+        status = isempty(current_prefix) || check_partition_compatibility(
+            g1_condensation,
+            colorings[1:length(current_prefix)],
+            [set_partitions[id] for id ∈ current_prefix],
+        )
+        if status && length(current_prefix) < length(colorings)
+            push!(current_prefix, 1)
+        else
+            if status
+                push!(compatible_partitions, copy(current_prefix))
+            end
+            while length(current_prefix) > init_length && current_prefix[end] == length(set_partitions)
+                pop!(current_prefix)
+            end
+            if length(current_prefix) == init_length
+                break
+            end
+            current_prefix[end] += 1
+            ProgressMeter.update!(progress, sum(
+                current_prefix[id] * D ^ (length(colorings) - init_length - id)
+                for id in eachindex(current_prefix)
+            ))
+        end
+    end
+    return compatible_partitions
 end
 
 end
