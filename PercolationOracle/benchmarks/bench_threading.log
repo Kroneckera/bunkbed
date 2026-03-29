@@ -1,0 +1,37 @@
+  Activating project at `/workspace/percolation-inequalities-oracle/code/julia`
+======================================================================
+Threading Benchmark: Paper family (n=3, m=4, 8 colorings)
+Julia threads available: 4
+Runs per config: 5 (min time reported)
+======================================================================
+
+[warmup] Single-threaded...
+[warmup] Threaded...
+
+[bench] n_threads=1:
+  |F| = 1265  hash = 7e15670f2c853fa80464575213bf190f8deb9e8e
+  min = 0.016964 s  median = 0.017224 s
+  counts-by-g1 = [25, 240, 240, 60, 700]
+
+[bench] n_threads=2:
+  |F| = 1265  hash = 7e15670f2c853fa80464575213bf190f8deb9e8e
+  min = 0.012037 s  median = 0.012434 s
+  counts-by-g1 = [25, 240, 240, 60, 700]
+
+[bench] n_threads=4:
+  |F| = 1265  hash = 7e15670f2c853fa80464575213bf190f8deb9e8e
+  min = 0.010669 s  median = 0.011082 s
+  counts-by-g1 = [25, 240, 240, 60, 700]
+
+======================================================================
+Summary
+======================================================================
+Threads          Min (s)    Median (s)  Speedup(min)  Speedup(med)
+----------------------------------------------------------------------
+1               0.016964      0.017224          1.00x         1.00x
+2               0.012037      0.012434          1.41x         1.39x
+4               0.010669      0.011082          1.59x         1.55x
+
+Correctness check:
+  All hashes match reference: true
+  Reference hash: 7e15670f2c853fa80464575213bf190f8deb9e8e

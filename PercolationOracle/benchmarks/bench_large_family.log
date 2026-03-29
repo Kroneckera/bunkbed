@@ -1,0 +1,32 @@
+Compiling functions...
+Compilation done.
+
+--- Benchmarking m=4 (8 trees) ---
+  |F| count: 		1265
+  Single-thread time: 	0.0163 s
+  Multi-thread time: 	0.0112 s
+  Speedup: 		1.46x
+  Hash (single): 	7e15670f2c853fa80464575213bf190f8deb9e8e
+  Consistency check: 	PASS
+
+--- Benchmarking m=6 (12 trees) ---
+  |F| count: 		18789
+  Single-thread time: 	1.7093 s
+  Multi-thread time: 	1.7358 s
+  Speedup: 		0.98x
+  Hash (single): 	af9d0fff5a270d2b7e9d56ba6d758915b7aec3f3
+  Consistency check: 	PASS
+
+--- Benchmarking m=7 (14 trees) ---
+  |F| count: 		78097
+  Single-thread time: 	38.9525 s
+  Multi-thread time: 	39.08 s
+  Speedup: 		1.0x
+  Hash (single): 	12a8cb6dc6cd43c9262795d116b78ac296fa108d
+  Consistency check: 	PASS
+
+--- Correctness Verification (Subset Consistency) ---
+Is projected F(m=6) a subset of F(m=4)? 	PASS
+Is projected F(m=7) a subset of F(m=6)? 	PASS
+
+All benchmarks and verifications completed successfully.

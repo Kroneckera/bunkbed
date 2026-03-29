@@ -1,0 +1,42 @@
+  Activating project at `/workspace/percolation-inequalities-oracle/code/julia`
+================================================================================
+Scaling Benchmark: n=3, m=1..8 (2m colorings per condensation)
+Julia threads available: 4
+Runs per config: 3 (min time reported)
+================================================================================
+
+[warmup] Running paper family regression...
+
+[bench] m=1 (free colorings=1):
+  |F| = 25
+  min = 0.000018 s  median = 0.000018 s
+  hash = 815c6fc8dfb6f95ba03f7330fd4fca99bbec027b
+
+[bench] m=2 (free colorings=3):
+  |F| = 139
+  min = 0.000206 s  median = 0.000206 s
+  hash = 94fd16c6503aeff6cbb0f64675d6dc9eb7361e33
+
+[bench] m=3 (free colorings=5):
+  |F| = 570
+  min = 0.002738 s  median = 0.002759 s
+  hash = efbcd7835a9bb345e9c4051f5771c65bbe17a398
+
+[bench] m=4 (free colorings=7):
+  |F| = 1265
+  min = 0.014724 s  median = 0.014861 s
+  hash = 7e15670f2c853fa80464575213bf190f8deb9e8e
+
+================================================================================
+Scaling Summary (single-threaded)
+================================================================================
+m     Free cols     |F|                Min (s)    Median (s)  Hash                                      
+--------------------------------------------------------------------------------
+1     1             25                0.000018      0.000018  815c6fc8dfb6f95ba03f7330fd4fca99bbec027b
+2     3             139               0.000206      0.000206  94fd16c6503aeff6cbb0f64675d6dc9eb7361e33
+3     5             570               0.002738      0.002759  efbcd7835a9bb345e9c4051f5771c65bbe17a398
+4     7             1265              0.014724      0.014861  7e15670f2c853fa80464575213bf190f8deb9e8e
+
+[bench] m=4 threaded comparison (n_threads=4):
+  Threaded min = 0.011984 s (vs single-threaded min = 0.014724 s)
+  Speedup = 1.23x

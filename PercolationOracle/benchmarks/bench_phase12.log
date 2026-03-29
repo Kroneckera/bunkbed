@@ -1,0 +1,8 @@
+[bench_phase12] Warm-up run...
+[bench_phase12] Warm-up count=1265 hash=7e15670f2c853fa80464575213bf190f8deb9e8e
+[bench_phase12] Regression count=1265
+[bench_phase12] Regression counts-by-g1=[25, 240, 240, 60, 700]
+[bench_phase12] Regression hash=7e15670f2c853fa80464575213bf190f8deb9e8e
+[bench_phase12] Optimized wall time: 0.017045 s
+[bench_phase12] Baseline wall time reference: 29.1005 s
+[bench_phase12] Speedup vs baseline reference: 1707.26x
