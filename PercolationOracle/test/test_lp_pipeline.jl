@@ -6,7 +6,10 @@ using PercolationOracle
 const LP_PKG_ROOT = normpath(joinpath(@__DIR__, ".."))
 const LP_REPO_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 
-function flatten_tables(tables, n_obs::Int)
+function flatten_tables(tables, n_obs::Int; phi_order::Symbol=:paper)
+    if phi_order !== :baseline
+        tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in tables]
+    end
     values = Int[]
     for k in 1:length(tables), p in all_partition_ids(n_obs), q in all_partition_ids(n_obs)
         push!(values, tables[k][Int(p) + 1, Int(q) + 1])
@@ -103,7 +106,7 @@ end
     @test verify_certificate(cert11, F; n_obs=3, m=4).minimum == 0
     @test verify_certificate(cert12, F; n_obs=3, m=4).feasible
     @test verify_certificate(cert12, F; n_obs=3, m=4).minimum == 0
-    @test !verify_certificate(appendixA_certificate_11(tree_order=:paper), F; n_obs=3, m=4).feasible
+    @test !verify_certificate(appendixA_certificate_11(tree_order=:archive), F; n_obs=3, m=4).feasible
 end
 
 @testset "Quadratic polynomial extraction" begin
@@ -111,7 +114,7 @@ end
     cert12 = appendixA_certificate_12()
     poly11 = extract_quadratic_polynomial(cert11, 3)
     poly12 = extract_quadratic_polynomial(cert12, 3)
-    poly7 = extract_quadratic_polynomial(inequality7_proof_potentials(), 3)
+    poly7 = extract_quadratic_polynomial(inequality7_proof_potentials(order=:paper), 3)
 
     diag11, off11 = expected_poly11()
     diag12, off12 = expected_poly12()
@@ -174,12 +177,12 @@ end
     @test pilot.unique >= 1
     @test all(item.verification.feasible for item in pilot.catalog)
 
-    ineq7_tables = inequality7_proof_potentials()
+    ineq7_tables = inequality7_proof_potentials(order=:paper)
     obstruction = verify_certificate(ineq7_tables, F; n_obs=3, m=4)
     @test !obstruction.feasible
     @test obstruction.minimum == -1
 
-    fixed = verify_certificate(inequality7_proof_potentials(swap_T3_pair=true), F; n_obs=3, m=4)
+    fixed = verify_certificate(inequality7_proof_potentials(order=:paper, swap_T3_pair=true), F; n_obs=3, m=4)
     @test fixed.feasible
     @test fixed.minimum == 0
 end

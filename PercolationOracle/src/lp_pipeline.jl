@@ -23,12 +23,15 @@ function load_feasible_tuples(path::AbstractString=PAPER_FAMILY_F_PATH; key::Abs
     return artifact isa Dict ? artifact[key] : artifact
 end
 
-paper_family_feasible_tuples() = load_feasible_tuples()
+function paper_family_feasible_tuples(; id_base::Symbol=:auto)
+    raw_tuples = load_feasible_tuples()
+    return [archive_tuple_to_paper_pairs(tuple_like, 3, 4; id_base=id_base) for tuple_like in raw_tuples]
+end
 
 function _order_ids(n_obs::Int, order::Symbol)
     if order === :baseline
         return collect(all_partition_ids(n_obs))
-    elseif order === :appendixA
+    elseif order === :appendixA || order === :paper
         n_obs == 3 || throw(ArgumentError("Appendix-A order is only defined for n_obs=3"))
         return APPENDIX_ORDER_IDS
     else
@@ -254,8 +257,11 @@ function build_constraint_matrix(feasible_tuples, n_obs::Int, m::Int; id_base::S
     return sparse(I, J, V, rows, cols)
 end
 
-function verify_certificate(phi_tables, feasible_tuples; n_obs::Int=3, m::Int=4, id_base::Symbol=:auto, max_witnesses::Int=3)
+function verify_certificate(phi_tables, feasible_tuples; n_obs::Int=3, m::Int=4, id_base::Symbol=:auto, max_witnesses::Int=3, phi_order::Symbol=:paper)
     tables = _coerce_phi_tables(phi_tables, n_obs, m)
+    if phi_order !== :baseline
+        tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in tables]
+    end
     bell = bell_number(n_obs)
     resolved_base = id_base === :auto ? _detect_partition_id_base(feasible_tuples, bell) : id_base
     min_value = nothing
@@ -293,8 +299,11 @@ function verify_certificate(phi_tables, feasible_tuples; n_obs::Int=3, m::Int=4,
     )
 end
 
-function extract_quadratic_polynomial(phi_tables, n_obs::Int)
+function extract_quadratic_polynomial(phi_tables, n_obs::Int; phi_order::Symbol=:paper)
     tables = _coerce_phi_tables(phi_tables, n_obs, _infer_m(phi_tables, n_obs))
+    if phi_order !== :baseline
+        tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in tables]
+    end
     bell = bell_number(n_obs)
     aggregated = zeros(promote_type(map(eltype, tables)...), bell, bell)
     for table in tables
@@ -364,8 +373,8 @@ function _symmetrized_coefficient_vector(poly)
     return values
 end
 
-function polynomial_signature(phi_tables, n_obs::Int; tol::Real=1e-8)
-    poly = extract_quadratic_polynomial(phi_tables, n_obs)
+function polynomial_signature(phi_tables, n_obs::Int; tol::Real=1e-8, phi_order::Symbol=:paper)
+    poly = extract_quadratic_polynomial(phi_tables, n_obs; phi_order=phi_order)
     return canonicalize_integer_ray(_symmetrized_coefficient_vector(poly); tol=tol, normalize_sign=false)
 end
 
@@ -418,9 +427,9 @@ function find_inequality(M_F::SparseMatrixCSC, objective, normalization; n_obs::
     raw_tables = _coerce_phi_tables(phi_value, n_obs, m)
     primitive_tables = canonicalize_phi_tables(phi_value, n_obs, m; tol=rationalize_tol)
     primitive_vector = _flatten_phi_tables(primitive_tables, n_obs, m)
-    primitive_poly = extract_quadratic_polynomial(primitive_tables, n_obs)
-    primitive_signature = polynomial_signature(primitive_tables, n_obs; tol=rationalize_tol)
-    verification = feasible_tuples === nothing ? nothing : verify_certificate(primitive_tables, feasible_tuples; n_obs=n_obs, m=m)
+    primitive_poly = extract_quadratic_polynomial(primitive_tables, n_obs; phi_order=:baseline)
+    primitive_signature = polynomial_signature(primitive_tables, n_obs; tol=rationalize_tol, phi_order=:baseline)
+    verification = feasible_tuples === nothing ? nothing : verify_certificate(primitive_tables, feasible_tuples; n_obs=n_obs, m=m, phi_order=:baseline)
 
     return merge(result, (
         raw_tables = raw_tables,
@@ -433,9 +442,13 @@ function find_inequality(M_F::SparseMatrixCSC, objective, normalization; n_obs::
 end
 
 
-function recover_target_certificate(M_F::SparseMatrixCSC, target_phi, normalization; n_obs::Int, m::Int, feasible_tuples=nothing, rationalize_tol::Real=1e-8, time_limit_sec::Union{Nothing,Real}=nothing)
+function recover_target_certificate(M_F::SparseMatrixCSC, target_phi, normalization; n_obs::Int, m::Int, feasible_tuples=nothing, rationalize_tol::Real=1e-8, time_limit_sec::Union{Nothing,Real}=nothing, phi_order::Symbol=:paper)
     nvars = size(M_F, 2)
-    target = Float64.(_flatten_phi_tables(target_phi, n_obs, m))
+    target_tables = _coerce_phi_tables(target_phi, n_obs, m)
+    if phi_order !== :baseline
+        target_tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in target_tables]
+    end
+    target = Float64.(_flatten_phi_tables(target_tables, n_obs, m))
     d = _dense_linear_form(normalization, nvars)
     scale = dot(d, target)
     abs(scale) > 1e-12 || throw(ArgumentError("normalization is orthogonal to the target certificate"))
@@ -476,10 +489,10 @@ function recover_target_certificate(M_F::SparseMatrixCSC, target_phi, normalizat
     raw_tables = _coerce_phi_tables(phi_value, n_obs, m)
     primitive_tables = canonicalize_phi_tables(phi_value, n_obs, m; tol=rationalize_tol)
     primitive_vector = _flatten_phi_tables(primitive_tables, n_obs, m)
-    primitive_poly = extract_quadratic_polynomial(primitive_tables, n_obs)
-    primitive_signature = polynomial_signature(primitive_tables, n_obs; tol=rationalize_tol)
-    verification = feasible_tuples === nothing ? nothing : verify_certificate(primitive_tables, feasible_tuples; n_obs=n_obs, m=m)
-    target_signature = polynomial_signature(target_phi, n_obs; tol=rationalize_tol)
+    primitive_poly = extract_quadratic_polynomial(primitive_tables, n_obs; phi_order=:baseline)
+    primitive_signature = polynomial_signature(primitive_tables, n_obs; tol=rationalize_tol, phi_order=:baseline)
+    verification = feasible_tuples === nothing ? nothing : verify_certificate(primitive_tables, feasible_tuples; n_obs=n_obs, m=m, phi_order=:baseline)
+    target_signature = polynomial_signature(target_tables, n_obs; tol=rationalize_tol, phi_order=:baseline)
 
     return merge(result, (
         raw_tables = raw_tables,
@@ -568,22 +581,23 @@ function _mat(rows::Vector{Vector{Int}})
     return reduce(vcat, (reshape(row, 1, :) for row in rows))
 end
 
-function appendixA_certificate_11(; order::Symbol=:baseline, tree_order::Symbol=:archive)
+function appendixA_certificate_11(; order::Symbol=:paper, tree_order::Symbol=:paper)
+    tree_order in (:paper, :archive) || throw(ArgumentError("unsupported tree_order: $tree_order"))
     raw_blocks = [
         zeros(Int, 5, 5),
-        _mat([
-            [ 0, -1, -1,  0, -1],
-            [ 0,  0,  0,  0,  0],
-            [ 0,  1,  1,  0,  1],
-            [ 0,  0,  0,  0,  0],
-            [ 1,  1,  1,  1,  1],
-        ]),
         _mat([
             [-1,  0,  0, -1,  0],
             [ 0,  0,  0,  0,  0],
             [ 1,  0,  0,  1,  0],
             [ 1,  1,  1,  1,  1],
             [ 0,  0,  0,  0,  0],
+        ]),
+        _mat([
+            [ 0, -1, -1,  0, -1],
+            [ 0,  0,  0,  0,  0],
+            [ 0,  1,  1,  0,  1],
+            [ 0,  0,  0,  0,  0],
+            [ 1,  1,  1,  1,  1],
         ]),
         _mat([
             [ 1,  1,  1,  1,  1],
@@ -594,12 +608,12 @@ function appendixA_certificate_11(; order::Symbol=:baseline, tree_order::Symbol=
         ]),
     ]
     ordered_blocks = tree_order === :archive ? [raw_blocks[1], raw_blocks[3], raw_blocks[2], raw_blocks[4]] : raw_blocks
-    return [reorder_pair_matrix(block, 3; from_order=:appendixA, to_order=order) for block in ordered_blocks]
+    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in ordered_blocks]
 end
 
-function appendixA_certificate_12(; order::Symbol=:baseline, tree_order::Symbol=:archive)
+function appendixA_certificate_12(; order::Symbol=:paper, tree_order::Symbol=:paper)
+    tree_order in (:paper, :archive) || throw(ArgumentError("unsupported tree_order: $tree_order"))
     raw_blocks = [
-        zeros(Int, 5, 5),
         zeros(Int, 5, 5),
         _mat([
             [0, 0, 0, 0, 0],
@@ -608,6 +622,7 @@ function appendixA_certificate_12(; order::Symbol=:baseline, tree_order::Symbol=
             [0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0],
         ]),
+        zeros(Int, 5, 5),
         _mat([
             [ 0,  0,  0,  0,  0],
             [ 0, -1,  0,  0, -1],
@@ -617,7 +632,7 @@ function appendixA_certificate_12(; order::Symbol=:baseline, tree_order::Symbol=
         ]),
     ]
     ordered_blocks = tree_order === :archive ? [raw_blocks[1], raw_blocks[3], raw_blocks[2], raw_blocks[4]] : raw_blocks
-    return [reorder_pair_matrix(block, 3; from_order=:appendixA, to_order=order) for block in ordered_blocks]
+    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in ordered_blocks]
 end
 
 """
@@ -630,7 +645,7 @@ so when verifying against the archived paper-family feasible set `F ⊂ (J₃²)
 `swap_T3_pair=true` implements this by transposing only the 4th table (which preserves the induced symmetric quadratic inequality).
 """
 function inequality7_proof_potentials(; order::Symbol=:baseline, swap_T3_pair::Bool=false)
-    order in (:baseline, :appendixA) || throw(ArgumentError("unsupported order: $order"))
+    order in (:baseline, :appendixA, :paper) || throw(ArgumentError("unsupported order: $order"))
     tables = [zeros(Int, 5, 5) for _ in 1:4]
 
     # Baseline J3 ids: 123=0, 12|3=1, 13|2=2, 1|23=3, 1|2|3=4.
@@ -645,5 +660,5 @@ function inequality7_proof_potentials(; order::Symbol=:baseline, swap_T3_pair::B
         tables[4] = permutedims(tables[4], (2, 1))
     end
 
-    return order === :baseline ? tables : [reorder_pair_matrix(table, 3; from_order=:baseline, to_order=:appendixA) for table in tables]
+    return order === :baseline ? tables : [reorder_pair_matrix(table, 3; from_order=:baseline, to_order=order) for table in tables]
 end
