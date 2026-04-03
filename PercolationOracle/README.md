@@ -164,7 +164,7 @@ Pkg.develop(path="/path/to/bunkbed/PercolationOracle")
 
 ### `enumerate_all_inequalities`
 
-Run the full D1-to-D2 pipeline. Loads archived feasible tuples, builds the constraint matrix, extends with symmetric polynomial variables, and passes to the projected cone oracle.
+Run the full D1-to-D2 pipeline. Loads the included legacy feasible-tuple archive, normalizes it on load to the paper tree order \((T_0,T_1,T_2,T_3)\), builds the constraint matrix, extends with symmetric polynomial variables, and passes to the projected cone oracle.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -215,7 +215,7 @@ LP-based inequality discovery. `find_inequality` solves a single LP to find one 
 
 ### `load_feasible_tuples`
 
-Deserialize archived feasible tuples from a `.jls` file. Default path points to the included paper-family archive.
+Load feasible tuples from the included `.jls` archive and normalize them on load to the paper tree order \((T_0,T_1,T_2,T_3)\). For raw archive access, use `load_feasible_tuples_raw`.
 
 ### `canonicalize_integer_ray`
 
@@ -234,7 +234,7 @@ Archived feasible-tuple datasets live in `data/`:
 | `valid_partition_tuples_nobs3_notebook.txt` | Pipe-delimited | Human-readable partition labels, e.g. `123 \|\| 12\|3 \|\| ...` |
 | `valid_partition_tuples_nobs2_restricted.*` | Same formats | Restricted feasible tuples for $n = 2$ |
 
-Each row represents a feasible partition 8-tuple $(\pi_0, \bar{\pi}_0, \pi_2, \bar{\pi}_2, \pi_1, \bar{\pi}_1, \pi_3, \bar{\pi}_3)$ in the archive ordering. The function `archive_tuple_to_paper_pairs` normalizes this to the paper ordering $(T_0, T_1, T_2, T_3)$.
+The `.jls`, `.tsv`, and `.txt` files are legacy raw archives. Their tree entries are stored in the historical order $(\pi_0, \bar{\pi}_0, \pi_2, \bar{\pi}_2, \pi_1, \bar{\pi}_1, \pi_3, \bar{\pi}_3)$. The public loader `load_feasible_tuples()` normalizes these tuples on load to the paper order $(T_0, T_1, T_2, T_3)$; use `load_feasible_tuples_raw()` only when you explicitly need the raw archive format.
 
 ---
 

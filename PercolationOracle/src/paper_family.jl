@@ -6,10 +6,10 @@ export regression_tuple_line, regression_tuple_hash, enumerate_paper_family_regr
 const PAPER_FAMILY_LABELS = (
     "T0",
     "T0_complement",
-    "T2",
-    "T2_complement",
     "T1",
     "T1_complement",
+    "T2",
+    "T2_complement",
     "T3",
     "T3_complement",
 )
@@ -19,27 +19,27 @@ function paper_family_decision_trees()
         DecisionTree([DecisionTreeStep([1, 2, 3, 4], 1)]),
         DecisionTree([DecisionTreeStep([1, 2, 3, 4], 2)]),
         DecisionTree([
-            DecisionTreeStep([2], 1),
-            DecisionTreeStep([1], 2),
             DecisionTreeStep([3], 1),
+            DecisionTreeStep([1], 2),
+            DecisionTreeStep([2], 1),
             DecisionTreeStep([4], 2),
         ]),
         DecisionTree([
-            DecisionTreeStep([2], 2),
-            DecisionTreeStep([1], 1),
             DecisionTreeStep([3], 2),
+            DecisionTreeStep([1], 1),
+            DecisionTreeStep([2], 2),
             DecisionTreeStep([4], 1),
         ]),
         DecisionTree([
-            DecisionTreeStep([3], 1),
-            DecisionTreeStep([1], 2),
             DecisionTreeStep([2], 1),
+            DecisionTreeStep([1], 2),
+            DecisionTreeStep([3], 1),
             DecisionTreeStep([4], 2),
         ]),
         DecisionTree([
-            DecisionTreeStep([3], 2),
-            DecisionTreeStep([1], 1),
             DecisionTreeStep([2], 2),
+            DecisionTreeStep([1], 1),
+            DecisionTreeStep([3], 2),
             DecisionTreeStep([4], 1),
         ]),
         DecisionTree([

@@ -16,6 +16,7 @@ using Combinatorics
     end
 
     @test [partition_label(3, pid) for pid in all_partition_ids(3)] == ["123", "12|3", "13|2", "1|23", "1|2|3"]
+    @test partition_order_labels(3) == ["123", "1|2|3", "1|23", "12|3", "13|2"]
     @test partition_block_count(4, encode_partition(4, [[1, 2], [3, 4]])) == 2
     @test collect(partition_assignments(3, encode_partition(3, [[1, 3], [2]]))) == UInt8[1, 2, 1]
 end

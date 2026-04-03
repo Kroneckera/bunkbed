@@ -14,6 +14,14 @@ function signature_from_coeffs(labels, coeffs::Dict{String, BigInt})
     return Tuple(get(coeffs, label, BigInt(0)) for label in labels)
 end
 
+function monomial_label(labels, left::String, right::String)
+    if left == right
+        return "mu($left)^2"
+    end
+    forward = "mu($left)*mu($right)"
+    return forward in labels ? forward : "mu($right)*mu($left)"
+end
+
 function expected_m2_signatures(labels)
     positivity = Set{Tuple{Vararg{BigInt}}}()
     for label in labels
@@ -22,8 +30,8 @@ function expected_m2_signatures(labels)
     end
     nontrivial = signature_from_coeffs(labels, Dict(
         "mu(123)*mu(1|2|3)" => BigInt(1),
-        "mu(12|3)*mu(13|2)" => BigInt(-1),
-        "mu(12|3)*mu(1|23)" => BigInt(-1),
+        monomial_label(labels, "12|3", "13|2") => BigInt(-1),
+        monomial_label(labels, "12|3", "1|23") => BigInt(-1),
     ))
     push!(positivity, nontrivial)
     return positivity
@@ -48,17 +56,17 @@ end
 
     coeffs = Dict(
         "mu(123)*mu(1|2|3)" => BigInt(1),
-        "mu(12|3)*mu(1|23)" => BigInt(-1),
-        "mu(13|2)*mu(1|23)" => BigInt(-1),
-        "mu(12|3)*mu(13|2)" => BigInt(-1),
+        monomial_label(result.labels, "12|3", "1|23") => BigInt(-1),
+        monomial_label(result.labels, "13|2", "1|23") => BigInt(-1),
+        monomial_label(result.labels, "12|3", "13|2") => BigInt(-1),
     )
     expected = signature_from_coeffs(result.labels, coeffs)
     signatures = Set(canonical_signature_tuple(ray) for ray in result.rays)
     @test expected in signatures
     @test any(
         occursin("mu(123)*mu(1|2|3)", item) &&
-        occursin("mu(12|3)*mu(1|23)", item) &&
-        occursin("mu(13|2)*mu(1|23)", item) &&
+        (occursin("mu(12|3)*mu(1|23)", item) || occursin("mu(1|23)*mu(12|3)", item)) &&
+        (occursin("mu(13|2)*mu(1|23)", item) || occursin("mu(1|23)*mu(13|2)", item)) &&
         occursin("mu(12|3)*mu(13|2)", item)
         for item in result.formatted_inequalities
     )

@@ -6,7 +6,7 @@ using PercolationOracle
 const LP_PKG_ROOT = normpath(joinpath(@__DIR__, ".."))
 const LP_REPO_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 
-function flatten_tables(tables, n_obs::Int; phi_order::Symbol=:paper)
+function flatten_tables(tables, n_obs::Int; phi_order::Symbol=default_partition_order(n_obs))
     if phi_order !== :baseline
         tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in tables]
     end
@@ -26,6 +26,10 @@ function sparse_row_nnz_counts(M::SparseMatrixCSC)
         end
     end
     return counts
+end
+
+function offdiag_coefficient(poly, p::PartitionID, q::PartitionID)
+    return haskey(poly.offdiag, (p, q)) ? poly.offdiag[(p, q)] : poly.offdiag[(q, p)]
 end
 
 function expected_poly11()
@@ -87,13 +91,16 @@ end
         (PartitionID(2), PartitionID(3)),
         (PartitionID(1), PartitionID(2)),
     )
+    @test partition_order_labels(3) == ["123", "1|2|3", "1|23", "12|3", "13|2"]
 
     base_matrix = reshape(collect(1:25), 5, 5)
-    @test reorder_pair_matrix(reorder_pair_matrix(base_matrix, 3; from_order=:baseline, to_order=:appendixA), 3; from_order=:appendixA, to_order=:baseline) == base_matrix
+    @test reorder_pair_matrix(reorder_pair_matrix(base_matrix, 3; from_order=:baseline, to_order=:paper), 3; from_order=:paper, to_order=:baseline) == base_matrix
 end
 
 @testset "Constraint matrix and certificate helpers" begin
+    raw_F = load_feasible_tuples_raw()
     F = paper_family_feasible_tuples()
+    @test first(F) == archive_tuple_to_paper_pairs(first(raw_F), 3, 4)
     M = build_constraint_matrix(F, 3, 4)
     @test size(M) == (1265, 100)
     @test nnz(M) == 1265 * 4
@@ -106,7 +113,6 @@ end
     @test verify_certificate(cert11, F; n_obs=3, m=4).minimum == 0
     @test verify_certificate(cert12, F; n_obs=3, m=4).feasible
     @test verify_certificate(cert12, F; n_obs=3, m=4).minimum == 0
-    @test !verify_certificate(appendixA_certificate_11(tree_order=:archive), F; n_obs=3, m=4).feasible
 end
 
 @testset "Quadratic polynomial extraction" begin
@@ -114,18 +120,21 @@ end
     cert12 = appendixA_certificate_12()
     poly11 = extract_quadratic_polynomial(cert11, 3)
     poly12 = extract_quadratic_polynomial(cert12, 3)
-    poly7 = extract_quadratic_polynomial(inequality7_proof_potentials(order=:paper), 3)
+    poly7 = extract_quadratic_polynomial(inequality7_proof_potentials(), 3)
 
     diag11, off11 = expected_poly11()
     diag12, off12 = expected_poly12()
     diag7, off7 = expected_poly7()
 
+    @test poly11.order == PartitionID[0, 4, 3, 1, 2]
+    @test poly12.order == PartitionID[0, 4, 3, 1, 2]
+    @test poly7.order == PartitionID[0, 4, 3, 1, 2]
     @test poly11.diagonal == diag11
-    @test poly11.offdiag == off11
+    @test all(offdiag_coefficient(poly11, p, q) == coeff for ((p, q), coeff) in off11)
     @test poly12.diagonal == diag12
-    @test poly12.offdiag == off12
+    @test all(offdiag_coefficient(poly12, p, q) == coeff for ((p, q), coeff) in off12)
     @test poly7.diagonal == diag7
-    @test poly7.offdiag == off7
+    @test all(offdiag_coefficient(poly7, p, q) == coeff for ((p, q), coeff) in off7)
 end
 
 @testset "find_inequality toy LP" begin
@@ -177,12 +186,12 @@ end
     @test pilot.unique >= 1
     @test all(item.verification.feasible for item in pilot.catalog)
 
-    ineq7_tables = inequality7_proof_potentials(order=:paper)
+    ineq7_tables = inequality7_proof_potentials()
     obstruction = verify_certificate(ineq7_tables, F; n_obs=3, m=4)
     @test !obstruction.feasible
     @test obstruction.minimum == -1
 
-    fixed = verify_certificate(inequality7_proof_potentials(order=:paper, swap_T3_pair=true), F; n_obs=3, m=4)
+    fixed = verify_certificate(inequality7_proof_potentials(swap_T3_pair=true), F; n_obs=3, m=4)
     @test fixed.feasible
     @test fixed.minimum == 0
 end

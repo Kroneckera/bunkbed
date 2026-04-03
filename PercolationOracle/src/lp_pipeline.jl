@@ -5,7 +5,7 @@ using JuMP
 using HiGHS
 
 export PAPER_FAMILY_F_PATH, PAPER_FAMILY_F_KEY, APPENDIX_ORDER_IDS
-export load_feasible_tuples, paper_family_feasible_tuples
+export load_feasible_tuples_raw, load_feasible_tuples, paper_family_feasible_tuples
 export baseline_to_appendix_id, appendix_to_baseline_id, reorder_pair_matrix
 export archive_tuple_to_paper_pairs, phi_index, inverse_phi_index, basis_direction
 export build_constraint_matrix, find_inequality, recover_target_certificate, extract_quadratic_polynomial, verify_certificate, systematic_inequality_search
@@ -16,27 +16,26 @@ const MOI = JuMP.MOI
 
 const PAPER_FAMILY_F_PATH = normpath(joinpath(@__DIR__, "..", "data", "valid_partition_tuples_nobs3_notebook.jls"))
 const PAPER_FAMILY_F_KEY = "tuples_ids_prefix"
-const APPENDIX_ORDER_IDS = PartitionID[0, 4, 3, 1, 2]
+const APPENDIX_ORDER_IDS = PAPER_J3_ORDER_IDS
 
-function load_feasible_tuples(path::AbstractString=PAPER_FAMILY_F_PATH; key::AbstractString=PAPER_FAMILY_F_KEY)
+function load_feasible_tuples_raw(path::AbstractString=PAPER_FAMILY_F_PATH; key::AbstractString=PAPER_FAMILY_F_KEY)
     artifact = deserialize(path)
     return artifact isa Dict ? artifact[key] : artifact
 end
 
-function paper_family_feasible_tuples(; id_base::Symbol=:auto)
-    raw_tuples = load_feasible_tuples()
-    return [archive_tuple_to_paper_pairs(tuple_like, 3, 4; id_base=id_base) for tuple_like in raw_tuples]
+function load_feasible_tuples(
+    path::AbstractString=PAPER_FAMILY_F_PATH;
+    key::AbstractString=PAPER_FAMILY_F_KEY,
+    n_obs::Int=3,
+    id_base::Symbol=:auto,
+)
+    n_obs == 3 || throw(ArgumentError("the bundled feasible-tuple archive currently supports only n_obs=3"))
+    raw_tuples = load_feasible_tuples_raw(path; key=key)
+    return [normalize_archive_feasible_tuple(tuple_like, n_obs; id_base=id_base) for tuple_like in raw_tuples]
 end
 
-function _order_ids(n_obs::Int, order::Symbol)
-    if order === :baseline
-        return collect(all_partition_ids(n_obs))
-    elseif order === :appendixA || order === :paper
-        n_obs == 3 || throw(ArgumentError("Appendix-A order is only defined for n_obs=3"))
-        return APPENDIX_ORDER_IDS
-    else
-        throw(ArgumentError("unknown partition order: $order"))
-    end
+function paper_family_feasible_tuples(; id_base::Symbol=:auto)
+    return load_feasible_tuples(; id_base=id_base)
 end
 
 function baseline_to_appendix_id(id::Integer)
@@ -52,108 +51,21 @@ function appendix_to_baseline_id(id::Integer)
 end
 
 function reorder_pair_matrix(matrix::AbstractMatrix, n_obs::Int; from_order::Symbol=:baseline, to_order::Symbol=:baseline)
-    size(matrix, 1) == size(matrix, 2) || throw(ArgumentError("pair matrix must be square"))
-    from_ids = _order_ids(n_obs, from_order)
-    to_ids = _order_ids(n_obs, to_order)
-    size(matrix, 1) == length(from_ids) || throw(ArgumentError("matrix size $(size(matrix)) incompatible with n_obs=$n_obs and from_order=$from_order"))
-    lookup = Dict(id => pos for (pos, id) in enumerate(from_ids))
-    perm = [lookup[id] for id in to_ids]
-    return matrix[perm, perm]
-end
-
-function _flatten_tuple_values(tuple_like)
-    values = Int[]
-    if tuple_like isa AbstractVector{<:Integer} || (tuple_like isa Tuple && all(item -> item isa Integer, tuple_like))
-        append!(values, Int.(tuple_like))
-        return values
-    end
-    for item in tuple_like
-        if !(item isa Tuple || item isa AbstractVector)
-            throw(ArgumentError("unsupported feasible-tuple item type: $(typeof(item))"))
-        end
-        length(item) == 2 || throw(ArgumentError("paired feasible tuple items must have length 2, got length $(length(item))"))
-        append!(values, Int.(item))
-    end
-    return values
-end
-
-function _detect_partition_id_base(values::AbstractVector{<:Integer}, bell::Int)
-    isempty(values) && throw(ArgumentError("cannot detect partition-id base from empty values"))
-    ints = Int.(values)
-    minv = minimum(ints)
-    maxv = maximum(ints)
-    if any(==(0), ints)
-        return :zero_based
-    elseif any(==(bell), ints)
-        return :one_based
-    elseif 1 <= minv && maxv <= bell
-        return :one_based
-    elseif 0 <= minv && maxv < bell
-        return :zero_based
-    else
-        throw(ArgumentError("partition ids outside valid ranges for Bell number $bell: min=$minv max=$maxv"))
-    end
-end
-
-function _detect_partition_id_base(feasible_tuples, bell::Int)
-    values = Int[]
-    for tuple_like in feasible_tuples
-        append!(values, _flatten_tuple_values(tuple_like))
-    end
-    return _detect_partition_id_base(values, bell)
-end
-
-function _normalize_partition_id(id::Integer, bell::Int; id_base::Symbol=:auto)
-    base = id_base === :auto ? _detect_partition_id_base([Int(id)], bell) : id_base
-    normalized = if base === :zero_based
-        Int(id)
-    elseif base === :one_based
-        Int(id) - 1
-    else
-        throw(ArgumentError("unsupported id_base: $id_base"))
-    end
-    0 <= normalized < bell || throw(ArgumentError("normalized partition id $normalized outside 0:$(bell - 1)"))
-    return PartitionID(normalized)
-end
-
-function _normalize_partition_ids(values::AbstractVector{<:Integer}, bell::Int; id_base::Symbol=:auto)
-    base = id_base === :auto ? _detect_partition_id_base(values, bell) : id_base
-    return PartitionID[_normalize_partition_id(value, bell; id_base=base) for value in values]
+    return reorder_partition_matrix(matrix, n_obs; from_order=from_order, to_order=to_order)
 end
 
 """
     archive_tuple_to_paper_pairs(tuple_like, n_obs, m; id_base=:auto)
 
-Normalize a feasible tuple to the paper tree order `(T0,T1,T2,T3,...)` and zero-based `PartitionID`s.
-For the archived paper-family artifact, the incoming 8-tuple order is
-`(p0,p̄0,p2,p̄2,p1,p̄1,p3,p̄3)`; this helper swaps the `T1/T2` pair positions.
-If the tuple is already provided as `m` explicit pairs, those pairs are preserved.
+Compatibility wrapper for the legacy paper-family archive.
+For the bundled 8-tuple artifact, the incoming tree order is `(T0,T2,T1,T3)`;
+this helper returns the normalized paper order `(T0,T1,T2,T3)`.
 """
 function archive_tuple_to_paper_pairs(tuple_like, n_obs::Int, m::Int; id_base::Symbol=:auto)
-    bell = bell_number(n_obs)
-    if !(tuple_like isa AbstractVector{<:Integer} || tuple_like isa Tuple{Vararg{<:Integer}})
-        paired = collect(tuple_like)
-        length(paired) == m || throw(ArgumentError("expected $m pair items, got $(length(paired))"))
-        base = id_base
-        return Tuple(begin
-            ids = _normalize_partition_ids(Int[item[1], item[2]], bell; id_base=base)
-            (ids[1], ids[2])
-        end for item in paired)
+    if n_obs == 3 && m == 4
+        return normalize_archive_feasible_tuple(tuple_like, n_obs; id_base=id_base)
     end
-
-    values = Int.(tuple_like)
-    length(values) == 2m || throw(ArgumentError("expected length $(2m) feasible tuple, got length $(length(values))"))
-    ids = _normalize_partition_ids(values, bell; id_base=id_base)
-
-    if m == 4 && length(ids) == 8
-        p0 = (ids[1], ids[2])
-        p2 = (ids[3], ids[4])
-        p1 = (ids[5], ids[6])
-        p3 = (ids[7], ids[8])
-        return (p0, p1, p2, p3)
-    end
-
-    return Tuple((ids[2k - 1], ids[2k]) for k in 1:m)
+    return normalize_feasible_tuple(tuple_like, n_obs, m; id_base=id_base)
 end
 
 function phi_index(k::Integer, p::Integer, pbar::Integer, n_obs::Int)
@@ -245,7 +157,7 @@ function build_constraint_matrix(feasible_tuples, n_obs::Int, m::Int; id_base::S
 
     offset = 1
     for (row, tuple_like) in enumerate(feasible_tuples)
-        pairs = archive_tuple_to_paper_pairs(tuple_like, n_obs, m; id_base=resolved_base)
+        pairs = normalize_feasible_tuple(tuple_like, n_obs, m; id_base=resolved_base)
         for k in 1:m
             p, pbar = pairs[k]
             I[offset] = row
@@ -257,7 +169,15 @@ function build_constraint_matrix(feasible_tuples, n_obs::Int, m::Int; id_base::S
     return sparse(I, J, V, rows, cols)
 end
 
-function verify_certificate(phi_tables, feasible_tuples; n_obs::Int=3, m::Int=4, id_base::Symbol=:auto, max_witnesses::Int=3, phi_order::Symbol=:paper)
+function verify_certificate(
+    phi_tables,
+    feasible_tuples;
+    n_obs::Int=3,
+    m::Int=4,
+    id_base::Symbol=:auto,
+    max_witnesses::Int=3,
+    phi_order::Symbol=default_partition_order(n_obs),
+)
     tables = _coerce_phi_tables(phi_tables, n_obs, m)
     if phi_order !== :baseline
         tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in tables]
@@ -270,7 +190,7 @@ function verify_certificate(phi_tables, feasible_tuples; n_obs::Int=3, m::Int=4,
     negatives = 0
 
     for (idx, tuple_like) in enumerate(feasible_tuples)
-        pairs = archive_tuple_to_paper_pairs(tuple_like, n_obs, m; id_base=resolved_base)
+        pairs = normalize_feasible_tuple(tuple_like, n_obs, m; id_base=resolved_base)
         total = zero(tables[1][1, 1])
         for k in 1:m
             p, pbar = pairs[k]
@@ -299,7 +219,12 @@ function verify_certificate(phi_tables, feasible_tuples; n_obs::Int=3, m::Int=4,
     )
 end
 
-function extract_quadratic_polynomial(phi_tables, n_obs::Int; phi_order::Symbol=:paper)
+function extract_quadratic_polynomial(
+    phi_tables,
+    n_obs::Int;
+    phi_order::Symbol=default_partition_order(n_obs),
+    output_order::Symbol=default_partition_order(n_obs),
+)
     tables = _coerce_phi_tables(phi_tables, n_obs, _infer_m(phi_tables, n_obs))
     if phi_order !== :baseline
         tables = [reorder_pair_matrix(table, n_obs; from_order=phi_order, to_order=:baseline) for table in tables]
@@ -310,7 +235,7 @@ function extract_quadratic_polynomial(phi_tables, n_obs::Int; phi_order::Symbol=
         aggregated .+= table
     end
 
-    ids = collect(all_partition_ids(n_obs))
+    ids = partition_order_ids(n_obs; order=output_order)
     labels = [partition_label(n_obs, pid) for pid in ids]
     diagonal = Dict{PartitionID, eltype(aggregated)}()
     offdiag = Dict{Tuple{PartitionID, PartitionID}, eltype(aggregated)}()
@@ -373,8 +298,14 @@ function _symmetrized_coefficient_vector(poly)
     return values
 end
 
-function polynomial_signature(phi_tables, n_obs::Int; tol::Real=1e-8, phi_order::Symbol=:paper)
-    poly = extract_quadratic_polynomial(phi_tables, n_obs; phi_order=phi_order)
+function polynomial_signature(
+    phi_tables,
+    n_obs::Int;
+    tol::Real=1e-8,
+    phi_order::Symbol=default_partition_order(n_obs),
+    output_order::Symbol=default_partition_order(n_obs),
+)
+    poly = extract_quadratic_polynomial(phi_tables, n_obs; phi_order=phi_order, output_order=output_order)
     return canonicalize_integer_ray(_symmetrized_coefficient_vector(poly); tol=tol, normalize_sign=false)
 end
 
@@ -442,7 +373,17 @@ function find_inequality(M_F::SparseMatrixCSC, objective, normalization; n_obs::
 end
 
 
-function recover_target_certificate(M_F::SparseMatrixCSC, target_phi, normalization; n_obs::Int, m::Int, feasible_tuples=nothing, rationalize_tol::Real=1e-8, time_limit_sec::Union{Nothing,Real}=nothing, phi_order::Symbol=:paper)
+function recover_target_certificate(
+    M_F::SparseMatrixCSC,
+    target_phi,
+    normalization;
+    n_obs::Int,
+    m::Int,
+    feasible_tuples=nothing,
+    rationalize_tol::Real=1e-8,
+    time_limit_sec::Union{Nothing,Real}=nothing,
+    phi_order::Symbol=default_partition_order(n_obs),
+)
     nvars = size(M_F, 2)
     target_tables = _coerce_phi_tables(target_phi, n_obs, m)
     if phi_order !== :baseline
@@ -581,8 +522,7 @@ function _mat(rows::Vector{Vector{Int}})
     return reduce(vcat, (reshape(row, 1, :) for row in rows))
 end
 
-function appendixA_certificate_11(; order::Symbol=:paper, tree_order::Symbol=:paper)
-    tree_order in (:paper, :archive) || throw(ArgumentError("unsupported tree_order: $tree_order"))
+function appendixA_certificate_11(; order::Symbol=default_partition_order(3))
     raw_blocks = [
         zeros(Int, 5, 5),
         _mat([
@@ -607,12 +547,10 @@ function appendixA_certificate_11(; order::Symbol=:paper, tree_order::Symbol=:pa
             [ 0,  0,  0,  0, -1],
         ]),
     ]
-    ordered_blocks = tree_order === :archive ? [raw_blocks[1], raw_blocks[3], raw_blocks[2], raw_blocks[4]] : raw_blocks
-    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in ordered_blocks]
+    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in raw_blocks]
 end
 
-function appendixA_certificate_12(; order::Symbol=:paper, tree_order::Symbol=:paper)
-    tree_order in (:paper, :archive) || throw(ArgumentError("unsupported tree_order: $tree_order"))
+function appendixA_certificate_12(; order::Symbol=default_partition_order(3))
     raw_blocks = [
         zeros(Int, 5, 5),
         _mat([
@@ -631,12 +569,11 @@ function appendixA_certificate_12(; order::Symbol=:paper, tree_order::Symbol=:pa
             [ 0,  0,  0,  0,  0],
         ]),
     ]
-    ordered_blocks = tree_order === :archive ? [raw_blocks[1], raw_blocks[3], raw_blocks[2], raw_blocks[4]] : raw_blocks
-    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in ordered_blocks]
+    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in raw_blocks]
 end
 
 """
-    inequality7_proof_potentials(; order=:baseline, swap_T3_pair=false)
+    inequality7_proof_potentials(; order=default_partition_order(3), swap_T3_pair=false)
 
 Return the 4 potential tables (one per tree) appearing in the proof of inequality (7) (Prop. 10.1 / `sections/proofs/ineq7.tex`).
 
@@ -644,8 +581,8 @@ Important convention note: the proof's 4th tree corresponds (at condensation lev
 so when verifying against the archived paper-family feasible set `F ⊂ (J₃²)⁴` one must swap the 4th pair `(p3,p̄3)`. Passing
 `swap_T3_pair=true` implements this by transposing only the 4th table (which preserves the induced symmetric quadratic inequality).
 """
-function inequality7_proof_potentials(; order::Symbol=:baseline, swap_T3_pair::Bool=false)
-    order in (:baseline, :appendixA, :paper) || throw(ArgumentError("unsupported order: $order"))
+function inequality7_proof_potentials(; order::Symbol=default_partition_order(3), swap_T3_pair::Bool=false)
+    order in (:baseline, :appendixA, :paper, :paper_n3) || throw(ArgumentError("unsupported order: $order"))
     tables = [zeros(Int, 5, 5) for _ in 1:4]
 
     # Baseline J3 ids: 123=0, 12|3=1, 13|2=2, 1|23=3, 1|2|3=4.

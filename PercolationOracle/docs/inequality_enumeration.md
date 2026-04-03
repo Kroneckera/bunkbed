@@ -84,14 +84,14 @@ sum_{p <= q} r[idx(p,q)] * mu(p) * mu(q) >= 0
 ```
 where `mu(p)` is the probability that the connectivity partition equals `p`.
 
-The `labels` vector maps each coordinate to its monomial:
+For `n=3`, the public labels use the paper order `(123, 1|2|3, 1|23, 12|3, 13|2)`. The `labels` vector maps each coordinate to its monomial:
 ```
 Index 1:  mu(123)^2           (diagonal: p=123, q=123)
-Index 2:  mu(12|3)^2          (diagonal)
+Index 2:  mu(1|2|3)^2         (diagonal)
 ...
-Index 6:  mu(123)*mu(12|3)    (off-diagonal: p=123, q=12|3)
+Index 6:  mu(123)*mu(1|2|3)   (off-diagonal: p=123, q=1|2|3)
 ...
-Index 15: mu(1|23)*mu(1|2|3)  (off-diagonal: p=1|23, q=1|2|3)
+Index 15: mu(12|3)*mu(13|2)   (off-diagonal: p=12|3, q=13|2)
 ```
 
 The `formatted_inequalities` express each ray as a readable polynomial inequality.
@@ -100,8 +100,8 @@ The `formatted_inequalities` express each ray as a readable polynomial inequalit
 
 ### Stage 1: Tuple acquisition
 
-Loads the archived m=4 feasible tuples from `data/valid_partition_tuples_nobs3_notebook.jls`,
-then projects to the target m by taking the first m tree pairs. Deduplicates via Set.
+Loads the included legacy m=4 feasible-tuple archive from `data/valid_partition_tuples_nobs3_notebook.jls`,
+normalizes it on load to the paper tree order `(T0, T1, T2, T3)`, then projects to the target `m` by taking the first `m` tree pairs. Deduplicates via `Set`.
 
 ```
 m=1: 25 unique tuples
@@ -174,8 +174,9 @@ independently for certificate construction and verification:
 
 ### Tuple handling
 
-- `load_feasible_tuples(path, key)` -- deserialize archived tuples from `.jls`
-- `archive_tuple_to_paper_pairs(tuple, n_obs, m)` -- normalize archive format to paper order
+- `load_feasible_tuples()` -- load the bundled feasible tuples and normalize them on load to the paper tree order
+- `load_feasible_tuples_raw(path, key)` -- read the raw legacy archive without normalization
+- `archive_tuple_to_paper_pairs(tuple, n_obs, m)` -- legacy compatibility helper for raw archive tuples
 - `phi_index(k, p, pbar, n_obs) -> Int` -- column index: `(k-1)*bell^2 + p*bell + pbar + 1`
 - `inverse_phi_index(index, n_obs) -> (tree, p, pbar)` -- inverse mapping
 
@@ -219,8 +220,8 @@ The pipeline does **not** silently fall back from Gurobi to HiGHS when Gurobi is
 
 ## Current Limitations
 
-1. **n=3 only:** Hard-gated to the archived paper-family tuples. n=4 support requires
-   extending `_project_archived_tuples` to handle n=4 archive formats.
+1. **n=3 only:** Hard-gated to the bundled paper-family archive. n=4 support requires
+   extending the tuple loader/projector path to handle n=4 archives.
 2. **m <= 4:** Limited by the archived m=4 dataset.
 3. **No live enumeration:** Tuples must come from the pre-serialized `.jls` file.
    To use custom tuples, call the internal functions directly:

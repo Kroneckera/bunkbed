@@ -1,6 +1,7 @@
 module PercolationOracle
 
 include("partitions.jl")
+include("conventions.jl")
 include("condensation.jl")
 include("colorings.jl")
 include("packed_state.jl")

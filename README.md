@@ -17,7 +17,7 @@ every graph and every edge-retention parameter.
 
 For $n = 3$, the partition lattice has $\lvert\mathcal{J}_3\rvert = 5$ elements:
 
-$$\lbrace 123\rbrace,\quad \lbrace 12\mid 3\rbrace,\quad \lbrace 13\mid 2\rbrace,\quad \lbrace 1\mid 23\rbrace,\quad \lbrace 1\mid 2\mid 3\rbrace.$$
+$$\lbrace 123\rbrace,\quad \lbrace 1\mid 2\mid 3\rbrace,\quad \lbrace 1\mid 23\rbrace,\quad \lbrace 12\mid 3\rbrace,\quad \lbrace 13\mid 2\rbrace.$$
 
 The question: what are all polynomial relations among $\mu(123), \mu(12\mid 3), \mu(13\mid 2), \mu(1\mid 23), \mu(1\mid 2\mid 3)$?
 
