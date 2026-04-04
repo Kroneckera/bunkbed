@@ -66,6 +66,23 @@ function expected_poly12()
     return diag, off
 end
 
+function expected_poly_ray15()
+    diag = Dict(pid => 0 for pid in all_partition_ids(3))
+    off = Dict(
+        (PartitionID(0), PartitionID(1)) => 1,   # xu
+        (PartitionID(0), PartitionID(2)) => 1,   # xv
+        (PartitionID(0), PartitionID(3)) => 1,   # xz
+        (PartitionID(0), PartitionID(4)) => -1,  # -xy
+        (PartitionID(1), PartitionID(2)) => 2,   # 2uv
+        (PartitionID(1), PartitionID(3)) => 1,   # zu
+        (PartitionID(1), PartitionID(4)) => 0,
+        (PartitionID(2), PartitionID(3)) => 1,   # zv
+        (PartitionID(2), PartitionID(4)) => 0,
+        (PartitionID(3), PartitionID(4)) => 1,   # yz
+    )
+    return diag, off
+end
+
 function expected_poly7()
     diag = Dict(PartitionID(0)=>0, PartitionID(1)=>1, PartitionID(2)=>1, PartitionID(3)=>1, PartitionID(4)=>0)
     off = Dict(
@@ -109,30 +126,41 @@ end
 
     cert11 = appendixA_certificate_11()
     cert12 = appendixA_certificate_12()
+    cert_r15 = appendixA_certificate_ray15()
     @test verify_certificate(cert11, F; n_obs=3, m=4).feasible
     @test verify_certificate(cert11, F; n_obs=3, m=4).minimum == 0
     @test verify_certificate(cert12, F; n_obs=3, m=4).feasible
     @test verify_certificate(cert12, F; n_obs=3, m=4).minimum == 0
+    @test length(cert_r15) == 4
+    @test all(size(block) == (5, 5) for block in cert_r15)
+    @test verify_certificate(cert_r15, F; n_obs=3, m=4).feasible
+    @test verify_certificate(cert_r15, F; n_obs=3, m=4).minimum == 0
 end
 
 @testset "Quadratic polynomial extraction" begin
     cert11 = appendixA_certificate_11()
     cert12 = appendixA_certificate_12()
+    cert_r15 = appendixA_certificate_ray15()
     poly11 = extract_quadratic_polynomial(cert11, 3)
     poly12 = extract_quadratic_polynomial(cert12, 3)
+    poly_r15 = extract_quadratic_polynomial(cert_r15, 3)
     poly7 = extract_quadratic_polynomial(inequality7_proof_potentials(), 3)
 
     diag11, off11 = expected_poly11()
     diag12, off12 = expected_poly12()
+    diag_r15, off_r15 = expected_poly_ray15()
     diag7, off7 = expected_poly7()
 
     @test poly11.order == PartitionID[0, 4, 3, 1, 2]
     @test poly12.order == PartitionID[0, 4, 3, 1, 2]
+    @test poly_r15.order == PartitionID[0, 4, 3, 1, 2]
     @test poly7.order == PartitionID[0, 4, 3, 1, 2]
     @test poly11.diagonal == diag11
     @test all(offdiag_coefficient(poly11, p, q) == coeff for ((p, q), coeff) in off11)
     @test poly12.diagonal == diag12
     @test all(offdiag_coefficient(poly12, p, q) == coeff for ((p, q), coeff) in off12)
+    @test poly_r15.diagonal == diag_r15
+    @test all(offdiag_coefficient(poly_r15, p, q) == coeff for ((p, q), coeff) in off_r15)
     @test poly7.diagonal == diag7
     @test all(offdiag_coefficient(poly7, p, q) == coeff for ((p, q), coeff) in off7)
 end

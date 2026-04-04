@@ -9,7 +9,7 @@ export load_feasible_tuples_raw, load_feasible_tuples, paper_family_feasible_tup
 export baseline_to_appendix_id, appendix_to_baseline_id, reorder_pair_matrix
 export archive_tuple_to_paper_pairs, phi_index, inverse_phi_index, basis_direction
 export build_constraint_matrix, find_inequality, recover_target_certificate, extract_quadratic_polynomial, verify_certificate, systematic_inequality_search
-export appendixA_certificate_11, appendixA_certificate_12, inequality7_proof_potentials
+export appendixA_certificate_11, appendixA_certificate_12, appendixA_certificate_ray15, inequality7_proof_potentials
 export canonicalize_integer_ray, canonicalize_phi_tables, polynomial_signature
 
 const MOI = JuMP.MOI
@@ -567,6 +567,34 @@ function appendixA_certificate_12(; order::Symbol=default_partition_order(3))
             [ 0, -1,  0,  0, -1],
             [ 0, -1, -1,  0, -1],
             [ 0,  0,  0,  0,  0],
+        ]),
+    ]
+    return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in raw_blocks]
+end
+
+function appendixA_certificate_ray15(; order::Symbol=default_partition_order(3))
+    raw_blocks = [
+        zeros(Int, 5, 5),
+        _mat([
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 1],
+            [1, 1, 0, 1, 1],
+            [0, 0, 0, 0, 0],
+        ]),
+        _mat([
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0],
+            [1, 1, 0, 1, 1],
+        ]),
+        _mat([
+            [ 0,  0,  0,  0,  0],
+            [-1,  0,  0, -1, -1],
+            [ 0,  0,  0,  0,  0],
+            [ 0,  0,  0, -1,  0],
+            [ 0,  0,  0,  0, -1],
         ]),
     ]
     return [reorder_pair_matrix(block, 3; from_order=:paper, to_order=order) for block in raw_blocks]
