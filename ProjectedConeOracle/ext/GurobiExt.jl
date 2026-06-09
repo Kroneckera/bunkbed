@@ -21,16 +21,16 @@ function _apply_gurobi!(adapter::GurobiAdapter, model::Model; method::Int, cross
 end
 
 function ProjectedConeOracle.configure_fast!(adapter::GurobiAdapter, model::Model)::Nothing
-    # Round 8 full-pipeline matrix: Method=0, Presolve=0 was the fastest uniform row
+    # Round 8 full-pipeline matrix: primal simplex was the fastest uniform method
     # matching the HiGHS 17-ray / 19-facet ground truth.
-    _apply_gurobi!(adapter, model; method=0, crossover=-1, presolve=0, numeric_focus=adapter.numeric_focus)
+    _apply_gurobi!(adapter, model; method=0, crossover=-1, presolve=adapter.presolve, numeric_focus=adapter.numeric_focus)
     return nothing
 end
 
 function ProjectedConeOracle.configure_verified!(adapter::GurobiAdapter, model::Model)::Nothing
-    # Verified phase stays on presolve-off dual simplex: it matched the HiGHS ground
-    # truth in the Round 8 matrix and remains the most conservative production check.
-    _apply_gurobi!(adapter, model; method=1, crossover=-1, presolve=0, numeric_focus=adapter.numeric_focus)
+    # Verified phase stays on dual simplex: it matched the HiGHS ground truth in the
+    # Round 8 matrix and remains the most conservative production check.
+    _apply_gurobi!(adapter, model; method=1, crossover=-1, presolve=adapter.presolve, numeric_focus=adapter.numeric_focus)
     return nothing
 end
 
