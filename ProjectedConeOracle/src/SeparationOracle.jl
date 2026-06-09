@@ -43,10 +43,9 @@ function SeparationOracle(
 
     model = create_model(adapter)
 
-    @variable(model, u[1:n] >= 0)
-    @variable(model, v[1:n] >= 0)
+    @variable(model, z[1:n])
     @variable(model, y[1:d])
-    @constraint(model, [t=1:d], y[t] == u[J[t]] - v[J[t]])
+    @constraint(model, [t=1:d], y[t] == z[J[t]])
 
     rows = [Vector{Tuple{Int,Float64}}() for _ in 1:m]
     for col in 1:n
@@ -59,7 +58,7 @@ function SeparationOracle(
     for i in 1:m
         lst = rows[i]
         if !isempty(lst)
-            @constraint(model, sum(val * (u[col] - v[col]) for (col, val) in lst) >= 0)
+            @constraint(model, sum(val * z[col] for (col, val) in lst) >= 0)
         end
     end
 
@@ -67,7 +66,7 @@ function SeparationOracle(
     @constraint(model, sum(cvec[t] * y[t] for t in 1:d) == 1.0)
     @objective(model, Min, sum(0.0 * y[t] for t in 1:d))
 
-    return SeparationOracle(model, u, v, y, collect(J), d, config, adapter, zeros(Float64, d))
+    return SeparationOracle(model, VariableRef[], VariableRef[], y, collect(J), d, config, adapter, zeros(Float64, d))
 end
 
 """
