@@ -84,6 +84,13 @@ function _lift_facets(M::AbstractMatrix{<:Integer}, sb::SubspaceBasis, config::O
     return _dedupe_vectors(facets, hash_key_normal, config)
 end
 
+function _oracle_normal(sb::SubspaceBasis, g_z::AbstractVector{<:Real}, config::OracleConfig)
+    h_y = canonical_normal(lift(sb, g_z), config)
+    maximum(abs, h_y) > config.canonical_tol ||
+        error("projected_cone_oracle: lifted facet normal is numerically zero")
+    return h_y
+end
+
 function _result_from_current_cone(
     rays_z::Vector{Vector{Float64}},
     sb::SubspaceBasis,
@@ -197,7 +204,7 @@ function projected_cone_oracle(
             g_key = hash_key_normal(g_z, config)
             g_key in validated_facets && continue
 
-            h_y = lift(sb, g_z)
+            h_y = _oracle_normal(sb, g_z, config)
             obj, y_candidate, facet_lp_calls = solve_verified!(
                 oracle,
                 h_y;

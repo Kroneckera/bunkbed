@@ -58,6 +58,16 @@ _facetset(vs, config=OracleConfig()) = Set(hash_key_normal(v, config) for v in v
         @test _facetset(result.facets, config) == Set([hash_key_normal([1.0, 1.0], config)])
     end
 
+    @testset "oracle facet normals are scale invariant" begin
+        sb = ProjectedConeOracle.SubspaceBasis(Matrix{Float64}(I, 2, 2))
+        h = ProjectedConeOracle._oracle_normal(sb, [2.0, -4.0], config)
+        h_scaled = ProjectedConeOracle._oracle_normal(sb, 1.0e40 .* [2.0, -4.0], config)
+
+        @test h == [0.5, -1.0]
+        @test h_scaled == h
+        @test maximum(abs, h_scaled) == 1.0
+    end
+
     @testset "checkpoint_resume" begin
         mktempdir() do dir
             checkpoint = joinpath(dir, "orthant_checkpoint.jls")
